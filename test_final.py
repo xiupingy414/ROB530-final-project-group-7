@@ -321,7 +321,6 @@ R_odom_to_gt, t_odom_to_gt = invert_rigid(R_gt_to_odom, t_gt_to_odom)
 odom_in_gt = apply_rigid(odom_pose_pos, R_odom_to_gt, t_odom_to_gt)
 lidar_in_gt = apply_rigid(lidar_in_odom, R_odom_to_gt, t_odom_to_gt)
 
-
 # ---------------------------------------------------------------
 # 5. EKF in odom-like frame
 # ---------------------------------------------------------------

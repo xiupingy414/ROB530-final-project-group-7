@@ -143,7 +143,7 @@ class extended_kalman_filter:
         H[1, 1] = 1.0
         H[2, 2] = 1.0
 
-        R = np.diag([0.10, 0.10, 0.10])**2
+        R = np.diag([0.01, 0.01, 0.01])**2
 
         v = z - z_hat
         S = H @ self.Sigma @ H.T + R
