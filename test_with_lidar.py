@@ -92,20 +92,44 @@ gt_data      = zarr.open(
 gt_pos       = gt_data['point'][:]
 gt_timestamp = gt_data['timestamp'][:]
 
-lidar_data     = np.load(r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/results/latest/kiss_icp_input_poses.npy")
-lidar_traj_raw = np.array([lidar_data[i][:3, 3] for i in range(len(lidar_data))])
-lidar_zarr     = zarr.open(
-    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/lidar/hesai_points_undistorted/hesai_points_undistorted", mode='r')
+def invert_T(T):
+    R = T[:3, :3]
+    t = T[:3, 3]
+    T_inv = np.eye(4)
+    T_inv[:3, :3] = R.T
+    T_inv[:3, 3] = -R.T @ t
+    return T_inv
+
+def transform_lidar_poses_to_base(lidar_poses, T_lidar_base):
+    base_positions = []
+    for k in range(len(lidar_poses)):
+        T_world_lidar = lidar_poses[k]
+        T_world_base = T_world_lidar @ T_lidar_base
+        base_positions.append(T_world_base[:3, 3])
+    return np.array(base_positions)
+
+# 读取完整 pose
+lidar_poses = np.load(
+    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/results/latest/kiss_icp_input_poses.npy"
+)
+
+lidar_zarr = zarr.open(
+    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/lidar/hesai_points_undistorted/hesai_points_undistorted",
+    mode='r'
+)
 lidar_timestamp = lidar_zarr['timestamp'][:]
-n_lidar         = min(len(lidar_traj_raw), len(lidar_timestamp))
-lidar_traj_raw  = lidar_traj_raw[:n_lidar]
+
+n_lidar = min(len(lidar_poses), len(lidar_timestamp))
+lidar_poses = lidar_poses[:n_lidar]
 lidar_timestamp = lidar_timestamp[:n_lidar]
 
-# -----------------------------
-# 2. LiDAR → base frame (TF rotation) + align start to odom
-# -----------------------------
-lidar_in_base = (R_hesai_in_base @ lidar_traj_raw.T).T
-lidar_aligned = lidar_in_base + (odom_pose_pos[0] - lidar_in_base[0])
+T_base_lidar = T_boxbase_in_base @ T_hesai_in_boxbase
+T_lidar_base = invert_T(T_base_lidar)
+
+lidar_base = transform_lidar_poses_to_base(lidar_poses, T_lidar_base)
+
+# 可选：如果你只是为了画图比较，可以再做一次首点对齐
+lidar_aligned = lidar_base + (odom_pose_pos[0] - lidar_base[0])
 
 print(f"After TF alignment:")
 print(f"  odom  0→100: {odom_pose_pos[100] - odom_pose_pos[0]}")
