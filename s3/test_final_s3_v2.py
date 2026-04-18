@@ -1,9 +1,8 @@
 import numpy as np
 import zarr
 import matplotlib.pyplot as plt
-from extended_kalman_filter_s1 import extended_kalman_filter
+from extended_kalman_filter_s3 import extended_kalman_filter
 import time
-
 
 # ---------------------------------------------------------------
 # TF utilities
@@ -173,7 +172,7 @@ def process_noise_from_imu(acc_cov, gyro_cov, dt):
 # ---------------------------------------------------------------
 start_time = time.time()
 imu_data = zarr.open(
-    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/s1/stim320_imu/stim320_imu",
+    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/s3/stim320_imu/stim320_imu",
     mode='r'
 )
 imu_lin_acc     = imu_data['lin_acc'][:]
@@ -183,18 +182,18 @@ imu_lin_acc_cov = imu_data['lin_acc_cov'][:]
 imu_ts          = imu_data['timestamp'][:]
 
 gt_data = zarr.open(
-    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/s1/anymal_state_odometry/anymal_state_odometry",
+    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/s3/anymal_state_odometry/anymal_state_odometry",
     mode='r'
 )
 gt_pos = gt_data['pose_pos'][:]
 gt_ts  = gt_data['timestamp'][:]
 
 lidar_poses = np.load(
-    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/s1/results/kiss_icp_input_poses.npy"
+    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/s3/lidar/results/kiss_icp_input_poses.npy"
 )
 
 lidar_zarr = zarr.open(
-    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/s1/lidar/hesai_points_undistorted/hesai_points_undistorted",
+    r"C:/Users/Lenovo/Desktop/Master/ROB530/final project/s3/lidar/hesai_points_undistorted/hesai_points_undistorted",
     mode='r'
 )
 lidar_ts = lidar_zarr['timestamp'][:]
@@ -349,14 +348,14 @@ ax.set_zlabel('Z (m)')
 ax.set_title('Trajectory Comparison — Anymal Odometry as Ground Truth\n(base frame, origin-shifted)')
 ax.legend(loc='upper left')
 plt.tight_layout()
-plt.savefig('trajectory_comparison_s1.png', dpi=150)
+plt.savefig('trajectory_comparison_s3.png', dpi=150)
 plt.show()
 
 # ---------------------------------------------------------------
 # 6. Save trajectories
 # ---------------------------------------------------------------
-np.save('ekf_trajectory_s1.npy', trajectory)
-print(f"\nEKF trajectory saved : ekf_trajectory_s1.npy  (shape={trajectory.shape})")
+np.save('ekf_trajectory_s3.npy', trajectory)
+print(f"\nEKF trajectory saved : ekf_trajectory_s3.npy  (shape={trajectory.shape})")
 
-np.save('gt_trajectory_s1.npy', gt_pos)
-print(f"GT trajectory saved  : gt_trajectory_s1.npy   (shape={gt_pos.shape})")
+np.save('gt_trajectory_s3.npy', gt_pos)
+print(f"GT trajectory saved  : gt_trajectory_s3.npy   (shape={gt_pos.shape})")
