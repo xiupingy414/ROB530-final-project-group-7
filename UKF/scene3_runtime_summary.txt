@@ -1,0 +1,4 @@
+total_runtime_sec: 719.468844
+algorithm_runtime_sec: 719.468844
+avg_runtime_per_frame_sec: 0.391016
+processed_lidar_frames: 1840
