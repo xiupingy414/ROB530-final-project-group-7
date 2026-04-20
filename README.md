@@ -37,7 +37,7 @@ ROB530-final-project-group-7/
 │   ├── ri_ekf_trajectory*.npy
 │   ├── runtime_*.npz
 │   ├── runtime_*.txt
-│
+├── README.md
 └── WN26_ROB530_group7_poster.pdf
 ```
 
@@ -46,7 +46,6 @@ The goal of this project is to estimate the robot trajectory by fusing multiple 
 
 - IMU → prediction  
 - LiDAR (KISS-ICP) → pose estimation  
-- Odometry → additional correction  
 - Ground truth (prism) → evaluation  
 
 We implement and compare:
@@ -97,7 +96,107 @@ cd kiss-icp
 pip install -e .
 ```
 
-### 4. Additional Notes
-- Make sure the dataset paths in the scripts are updated correctly.
-- KISS-ICP should be run before EKF/UKF/PF if LiDAR poses are required.
-- Raw dataset files are not included in this repository due to GitHub size limits.
+## 🧭 Usage
+
+This project is organized into multiple modules corresponding to different stages of the localization pipeline. Below is a guide on which files to use at each step.
+
+---
+
+### 1. LiDAR Processing
+
+The LiDAR-related scripts are located in the `lidar/` folder.
+
+- `lidar/hesai_points_undistorted/`  
+  Raw LiDAR point cloud data.
+
+- `lidar/KISS_ICP.py`  
+  Generates mapping results and performs LiDAR-based registration.
+
+- `lidar/KISS_ICP_output.py`  
+  Extracts pose trajectories from LiDAR data. These poses are later used as correction inputs in the filters.
+
+Run:
+
+```bash
+python lidar/KISS_ICP.py
+python lidar/KISS_ICP_output.py
+```
+
+### 2. Extended Kalman Filter (EKF)
+
+The EKF implementation is located in the `EKF/` folder.
+
+- `extended_kalman_filter_s1.py`, `extended_kalman_filter_s2.py`, `extended_kalman_filter_s3.py`
+EKF implementations for three different scenarios.
+- `test_final_s1_v2.py`, `test_final_s2_v2.py`, `test_final_s3_v2.py`
+Scripts used to run EKF for each scenario.
+- `ekf_trajectory_s*.npy`
+Saved EKF trajectory outputs.
+- `gt_trajectory_s*.npy`
+Ground truth trajectories for evaluation.
+
+Run:
+
+```bash
+python EKF/test_final_s1_v2.py
+python EKF/test_final_s2_v2.py
+python EKF/test_final_s3_v2.py
+```
+
+### 3. Unscented Kalman Filter (UKF)
+
+The UKF implementation is located in the `UKF/` folder.
+
+- `test1_runtime_noplotwait.py`, `test2_runtime_noplotwait.py`, `test3_runtime_noplotwait.py`
+Main UKF scripts for each scenario.
+- `error.py`
+Used for error analysis.
+- `scene*.png`
+Visualization results.
+- `scene*_runtime_summary.txt`
+Runtime summaries.
+
+Run:
+
+```bash
+python UKF/test1_runtime_noplotwait.py
+python UKF/test2_runtime_noplotwait.py
+python UKF/test3_runtime_noplotwait.py
+```
+
+### 4. Particle Filter (PF)
+
+The PF implementation is located in the `PF/` folder.
+
+- `PF_demo2.py`
+Main Particle Filter script.
+
+Run:
+
+```bash
+python PF/PF_demo2.py
+```
+
+### 5. Invariant EKF (RI-EKF / InEKF)
+
+The InEKF implementation is located in the `ri_ekf_results/` folder.
+
+- `RI_EKF_demo1.py`
+Main script for InEKF.
+- `ri_ekf_trajectory*.npy`
+Output trajectories.
+- `runtime_*.npz, runtime_*.txt`
+Runtime statistics.
+
+Run:
+
+```bash
+python ri_ekf_results/RI_EKF_demo1.py
+```
+
+### 6. Notes
+- Different scenarios (`s1`, `s2`, `s3`) correspond to different dataset sequences available in the 
+[ANYmal Grand Tour dataset](https://grand-tour.leggedrobotics.com/dataset):  
+`s1` → ETH-1, `s2` → SPX-1, `s3` → SNOW-1.
+- Make sure dataset paths are correctly set before running any script.
+- LiDAR results should be generated first, as they are used for correction in all filters.
