@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 
 # =========================================================
-# 1. 工具函数
+#
 # =========================================================
 def load_traj_csv(csv_path):
     """
@@ -88,8 +88,7 @@ def save_residual_csv(save_path, t, ref_pos, est_pos, residual):
 
 
 # =========================================================
-# 2. 三个场景路径
-#    你只需要确认这些文件名和你的实际保存结果一致
+# 
 # =========================================================
 SCENES = {
     "scene_1": {
@@ -110,7 +109,7 @@ SCENES = {
 }
 
 # =========================================================
-# 3. 主程序
+# 
 # =========================================================
 summary_rows = []
 
@@ -148,7 +147,7 @@ for scene_name, cfg in SCENES.items():
     print(f"Overlap points: {len(result['residual'])}")
 
     # -----------------------------------------------------
-    # 保存每个场景的 residual csv
+    # residual csv
     # -----------------------------------------------------
     residual_csv_path = os.path.join(output_dir, f"{scene_name}_ukf_vs_radar_residual.csv")
     save_residual_csv(
@@ -161,7 +160,7 @@ for scene_name, cfg in SCENES.items():
     print(f"Saved residual CSV: {residual_csv_path}")
 
     # -----------------------------------------------------
-    # 保存残差曲线图
+    # 
     # -----------------------------------------------------
     t_rel = result["t_overlap"] - result["t_overlap"][0]
 
@@ -179,7 +178,7 @@ for scene_name, cfg in SCENES.items():
     print(f"Saved residual plot: {residual_fig_path}")
 
     # -----------------------------------------------------
-    # 保存 summary
+    # summary
     # -----------------------------------------------------
     summary_rows.append({
         "scene": scene_name,
@@ -190,7 +189,7 @@ for scene_name, cfg in SCENES.items():
     })
 
 # =========================================================
-# 4. 保存三个场景总表
+# 
 # =========================================================
 if len(summary_rows) > 0:
     summary_df = pd.DataFrame(summary_rows)
