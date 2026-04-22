@@ -4,10 +4,6 @@ import zarr
 from scipy.linalg import expm
 from scipy.spatial.transform import Rotation as Rot
 
-
-# =========================
-# Basic math utilities
-# =========================
 def skew(v):
     v = np.asarray(v, dtype=float).reshape(3,)
     return np.array([
@@ -51,9 +47,6 @@ def log_so3(R):
     return Rot.from_matrix(R).as_rotvec()
 
 
-# =========================
-# Pose / TF utilities
-# =========================
 def pose_to_matrix(qw, qx, qy, qz, tx, ty, tz):
     T = np.eye(4)
     T[:3, :3] = Rot.from_quat([qx, qy, qz, qw]).as_matrix()
@@ -87,9 +80,6 @@ def T_from_Rp(R, p):
     return T
 
 
-# =========================
-# IMU prediction for one particle
-# =========================
 def imu_predict(R, v, p, omega_raw, accel_raw, bg, ba, dt):
     g = np.array([0.0, 0.0, -9.81])
 
@@ -104,9 +94,6 @@ def imu_predict(R, v, p, omega_raw, accel_raw, bg, ba, dt):
     return R_next, v_next, p_next
 
 
-# =========================
-# ICP wrapper
-# =========================
 def run_icp(scan_np, map_pcd_down, T_init, max_corr_dist=0.4, max_iter=50):
     scan_pcd = o3d.geometry.PointCloud()
     scan_pcd.points = o3d.utility.Vector3dVector(scan_np.astype(np.float64))
@@ -122,9 +109,6 @@ def run_icp(scan_np, map_pcd_down, T_init, max_corr_dist=0.4, max_iter=50):
     return result
 
 
-# =========================
-# PF utilities
-# =========================
 def low_variance_resample(weights, rng):
     N = len(weights)
     indices = np.zeros(N, dtype=int)
@@ -170,27 +154,20 @@ def apply_small_noise(R, v, p, rng, rot_std, vel_std, pos_std):
 
 
 def select_representative_particles(Rs, vs, ps, weights, K=4, rng=None):
-    """
-    选少量代表粒子跑 ICP
-    默认：
-    - 1 个最大权重粒子
-    - 1 个加权均值附近粒子
-    - 剩下 K-2 个随机粒子
-    """
     N = len(weights)
     assert K <= N
 
-    # 1) best particle
+    # best particle
     idx_best = int(np.argmax(weights))
 
-    # 2) mean-nearest particle
+    # mean-nearest particle
     _, _, p_mean = estimate_from_particles(Rs, vs, ps, weights)
     dists = np.linalg.norm(ps - p_mean[None, :], axis=1)
     idx_mean = int(np.argmin(dists))
 
     chosen = {idx_best, idx_mean}
 
-    # 3) random fill
+    # random fill
     all_idx = list(range(N))
     if rng is None:
         rng = np.random.default_rng()
@@ -202,9 +179,6 @@ def select_representative_particles(Rs, vs, ps, weights, K=4, rng=None):
 
 
 def run_multi_icp_candidates(scan_np, map_pcd_down, Rs, ps, T_IL, indices):
-    """
-    对选出的几个代表粒子分别跑 ICP，选最好的一次
-    """
     best_result = None
     best_score = -np.inf
     best_idx = None
@@ -218,7 +192,6 @@ def run_multi_icp_candidates(scan_np, map_pcd_down, Rs, ps, T_IL, indices):
         fitness = result.fitness
         rmse = result.inlier_rmse if np.isfinite(result.inlier_rmse) else 1e6
 
-        # 分数：越大越好
         score = fitness - 0.5 * rmse
 
         if score > best_score:
@@ -232,9 +205,6 @@ def run_multi_icp_candidates(scan_np, map_pcd_down, Rs, ps, T_IL, indices):
 def compute_particle_log_weights_from_single_icp(
     Rs, ps, T_IL, T_WL_icp, sigma_pos, sigma_rot, fitness, rmse, sigma_rmse
 ):
-    """
-    用“选出来的最佳 ICP 结果”给所有粒子打分
-    """
     Np = len(ps)
     log_weights = np.zeros(Np)
 
@@ -261,9 +231,6 @@ def compute_particle_log_weights_from_single_icp(
     return log_weights
 
 
-# =========================
-# Main PF pipeline
-# =========================
 def main():
     rng = np.random.default_rng(0)
 
@@ -274,9 +241,6 @@ def main():
     lidar_path = f"{dataset_root}/data/hesai_points_undistorted"
     tf_path = f"{dataset_root}/data/tf"
 
-    # -------------------------
-    # PF parameters
-    # -------------------------
     N_particles = 50
     N_icp_candidates = 4
     resample_threshold = N_particles / 3.0
@@ -303,9 +267,8 @@ def main():
     fitness_threshold = 0.80
     rmse_threshold = 0.14
 
-    # -------------------------
+
     # Load map
-    # -------------------------
     map_pcd = o3d.io.read_point_cloud(map_path)
     voxel_size = 0.3
     map_pcd_down = map_pcd.voxel_down_sample(voxel_size)
@@ -314,9 +277,7 @@ def main():
     )
     print(f"Map: {len(map_pcd.points)} -> {len(map_pcd_down.points)} points")
 
-    # -------------------------
-    # Load IMU / LiDAR / TF
-    # -------------------------
+    # Load IMU / LiDAR / TF data
     z_imu = zarr.open(imu_path, mode="r")
     z_lidar = zarr.open(lidar_path, mode="r")
     z_tf = zarr.open(tf_path, mode="r")
@@ -334,9 +295,8 @@ def main():
     print("imu samples:", len(imu_t))
     print("lidar frames:", len(lidar_t))
 
-    # -------------------------
+
     # Build extrinsics
-    # -------------------------
     T_BI = get_tf_matrix(tf_dict["stim320_imu"])   # box_base <- imu
     T_BL = get_tf_matrix(tf_dict["hesai_lidar"])   # box_base <- lidar
 
@@ -347,9 +307,8 @@ def main():
     print("T_IL (imu <- lidar):\n", T_IL)
     print("T_LI (lidar <- imu):\n", T_LI)
 
-    # -------------------------
+
     # First frame ICP for initialization
-    # -------------------------
     k0 = 0
     n_valid0 = int(lidar_valid[k0, 0])
     scan0 = lidar_points[k0, :n_valid0, :]
@@ -365,9 +324,8 @@ def main():
     print(f"Init ICP fitness = {result0.fitness:.4f}, rmse = {result0.inlier_rmse:.4f}")
     print("Initialized T_WI_0:\n", T_WI_0)
 
-    # -------------------------
+
     # Initialize particles
-    # -------------------------
     Rs = np.zeros((N_particles, 3, 3))
     vs = np.zeros((N_particles, 3))
     ps = np.zeros((N_particles, 3))
@@ -384,9 +342,8 @@ def main():
 
     weights = np.ones(N_particles) / N_particles
 
-    # -------------------------
+
     # Storage
-    # -------------------------
     pf_imu_positions = []
     pf_lidar_positions = []
     pf_best_imu_positions = []
@@ -408,9 +365,8 @@ def main():
     pf_neff.append(effective_sample_size(weights))
     pf_times_used.append(lidar_t[0])
 
-    # -------------------------
+
     # Main loop over LiDAR frames
-    # -------------------------
     max_k = len(lidar_t)
     max_k = min(len(lidar_t), 300)   # 先跑300帧测试
 
@@ -421,9 +377,8 @@ def main():
         imu_idx_start = np.searchsorted(imu_t, t_prev, side="right")
         imu_idx_end = np.searchsorted(imu_t, t_curr, side="right")
 
-        # -------------------------
+
         # 1) Prediction for all particles
-        # -------------------------
         for j in range(imu_idx_start, imu_idx_end):
             if j == 0:
                 continue
@@ -441,15 +396,11 @@ def main():
                     dt
                 )
 
-        # -------------------------
         # 2) Current LiDAR scan
-        # -------------------------
         n_valid = int(lidar_valid[k, 0])
         scan_np = lidar_points[k, :n_valid, :]
 
-        # -------------------------
         # 3) Choose representative particles and run several ICPs
-        # -------------------------
         rep_indices = select_representative_particles(
             Rs, vs, ps, weights, K=N_icp_candidates, rng=rng
         )
@@ -464,9 +415,8 @@ def main():
         rmse = result.inlier_rmse if np.isfinite(result.inlier_rmse) else 1e6
         fitness = result.fitness
 
-        # -------------------------
+ 
         # 4) Measurement gating
-        # -------------------------
         use_measurement = (fitness >= fitness_threshold) and (rmse <= rmse_threshold)
 
         if use_measurement:
@@ -496,9 +446,8 @@ def main():
                 f"(fitness={fitness:.4f}, rmse={rmse:.4f})"
             )
 
-        # -------------------------
+
         # 5) State estimate
-        # -------------------------
         R_est, v_est, p_est = estimate_from_particles(Rs, vs, ps, weights)
         T_WI_est = T_from_Rp(R_est, p_est)
         T_WL_est = T_WI_est @ T_IL
@@ -515,9 +464,8 @@ def main():
         pf_neff.append(neff)
         pf_times_used.append(t_curr)
 
-        # -------------------------
+
         # 6) Resample if needed
-        # -------------------------
         if neff < resample_threshold:
             idx = low_variance_resample(weights, rng)
 
@@ -545,9 +493,8 @@ def main():
                 f"pf_pos = {p_est}"
             )
 
-    # -------------------------
+
     # Save results
-    # -------------------------
     np.save("pf_imu_positions.npy", np.array(pf_imu_positions))
     np.save("pf_lidar_positions.npy", np.array(pf_lidar_positions))
     np.save("pf_best_imu_positions.npy", np.array(pf_best_imu_positions))

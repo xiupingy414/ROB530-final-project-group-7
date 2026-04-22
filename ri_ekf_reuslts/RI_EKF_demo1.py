@@ -5,9 +5,6 @@ from scipy.linalg import expm
 from scipy.spatial.transform import Rotation as Rot
 
 
-# =========================
-# Basic math utilities
-# =========================
 def skew(v):
     v = np.asarray(v, dtype=float).reshape(3,)
     return np.array([
@@ -47,9 +44,6 @@ def log_so3(R):
     return Rot.from_matrix(R).as_rotvec()
 
 
-# =========================
-# Pose / TF utilities
-# =========================
 def pose_to_matrix(qw, qx, qy, qz, tx, ty, tz):
     T = np.eye(4)
     T[:3, :3] = Rot.from_quat([qx, qy, qz, qw]).as_matrix()
@@ -87,14 +81,7 @@ def T_from_Rp(R, p):
     return T
 
 
-# =========================
-# RI-EKF matrices
-# =========================
 def construct_A_matrix(R, v, p, g=np.array([0.0, 0.0, -9.81])):
-    """
-    Error-state ordering:
-        [dtheta, dv, dp, dbg, dba]
-    """
     R = np.asarray(R, dtype=float)
     v = np.asarray(v, dtype=float).reshape(3,)
     p = np.asarray(p, dtype=float).reshape(3,)
@@ -144,9 +131,6 @@ def adjoint(R, v, p, augmented=True):
     return Ad_aug
 
 
-# =========================
-# Prediction
-# =========================
 def prediction(R, v, p, omega_raw, accel_raw, bg, ba, dt, P, Q):
     g = np.array([0.0, 0.0, -9.81])
 
@@ -171,15 +155,7 @@ def prediction(R, v, p, omega_raw, accel_raw, bg, ba, dt, P, Q):
     return R_next, v_next, p_next, bg_next, ba_next, P_next
 
 
-# =========================
-# Correction
-# =========================
 def correction(R, v, p, bg, ba, P, T_WL_icp, T_LI, N):
-    """
-    T_WL_icp : world <- lidar
-    T_LI     : lidar <- imu
-    => T_WI_meas = T_WL_icp @ T_LI
-    """
     T_WI_meas = T_WL_icp @ T_LI
     R_meas = T_WI_meas[:3, :3]
     p_meas = T_WI_meas[:3, 3]
@@ -214,9 +190,6 @@ def correction(R, v, p, bg, ba, P, T_WL_icp, T_LI, N):
     return R_new, v_new, p_new, bg_new, ba_new, P_new
 
 
-# =========================
-# ICP wrapper
-# =========================
 def run_icp(scan_np, map_pcd_down, T_init, max_corr_dist=0.4, max_iter=50):
     scan_pcd = o3d.geometry.PointCloud()
     scan_pcd.points = o3d.utility.Vector3dVector(scan_np.astype(np.float64))
@@ -232,9 +205,6 @@ def run_icp(scan_np, map_pcd_down, T_init, max_corr_dist=0.4, max_iter=50):
     return result
 
 
-# =========================
-# Main pipeline
-# =========================
 def main():
     dataset_root = "Dataset/2024-10-01-11-29-55"
     map_path = f"{dataset_root}/point_cloud_maps/2024-10-01-11-29-55_dlio.ply"
@@ -243,9 +213,6 @@ def main():
     lidar_path = f"{dataset_root}/data/hesai_points_undistorted"
     tf_path = f"{dataset_root}/data/tf"
 
-    # -------------------------
-    # Load map
-    # -------------------------
     map_pcd = o3d.io.read_point_cloud(map_path)
     voxel_size = 0.3
     map_pcd_down = map_pcd.voxel_down_sample(voxel_size)
@@ -254,9 +221,7 @@ def main():
     )
     print(f"Map: {len(map_pcd.points)} -> {len(map_pcd_down.points)} points")
 
-    # -------------------------
-    # Load IMU / LiDAR / TF
-    # -------------------------
+
     z_imu = zarr.open(imu_path, mode="r")
     z_lidar = zarr.open(lidar_path, mode="r")
     z_tf = zarr.open(tf_path, mode="r")
@@ -274,9 +239,7 @@ def main():
     print("imu samples:", len(imu_t))
     print("lidar frames:", len(lidar_t))
 
-    # -------------------------
     # Build extrinsics
-    # -------------------------
     T_BI = get_tf_matrix(tf_dict["stim320_imu"])   # box_base <- imu
     T_BL = get_tf_matrix(tf_dict["hesai_lidar"])   # box_base <- lidar
 
@@ -287,9 +250,7 @@ def main():
     print("T_IL (imu <- lidar):\n", T_IL)
     print("T_LI (lidar <- imu):\n", T_LI)
 
-    # -------------------------
     # Process noise Q
-    # -------------------------
     Sigma_g = z_imu["ang_vel_cov"][0]
     Sigma_a = z_imu["lin_acc_cov"][0]
 
@@ -302,9 +263,7 @@ def main():
     Q[9:12, 9:12] = Sigma_bg
     Q[12:15, 12:15] = Sigma_ba
 
-    # -------------------------
     # ICP measurement covariance
-    # -------------------------
     sigma_rot = np.deg2rad(3.0)
     sigma_pos = 0.10
     N_icp = np.diag([
@@ -312,9 +271,7 @@ def main():
         sigma_pos**2, sigma_pos**2, sigma_pos**2
     ])
 
-    # -------------------------
     # First frame ICP for initialization
-    # -------------------------
     k0 = 0
     n_valid0 = int(lidar_valid[k0, 0])
     scan0 = lidar_points[k0, :n_valid0, :]
@@ -340,9 +297,7 @@ def main():
     print(f"Init ICP fitness = {result0.fitness:.4f}, rmse = {result0.inlier_rmse:.4f}")
     print("Initialized T_WI_0:\n", T_WI_0)
 
-    # -------------------------
     # Storage
-    # -------------------------
     imu_positions = [p.copy()]
     lidar_positions = [T_WL_0[:3, 3].copy()]
 
@@ -352,11 +307,8 @@ def main():
 
     times_used = [lidar_t[0]]
 
-    # -------------------------
     # Main loop over LiDAR frames
-    # -------------------------
     max_k = len(lidar_t)
-    # max_k = min(len(lidar_t), 300)   # 调试时可先跑前300帧
 
     for k in range(1, max_k):
         t_prev = lidar_t[k - 1]
@@ -418,9 +370,8 @@ def main():
                 f"imu_pos = {p}"
             )
 
-    # -------------------------
+
     # Save results
-    # -------------------------
     imu_positions = np.array(imu_positions)
     lidar_positions = np.array(lidar_positions)
     lidar_from_imu_positions = np.array(lidar_from_imu_positions)
